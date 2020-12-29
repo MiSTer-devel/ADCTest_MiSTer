@@ -151,7 +151,7 @@ module emu
 
 ///////// Default values for ports not used in this core /////////
 
-assign ADC_BUS  = 'Z;
+//assign ADC_BUS  = 'Z;
 assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
@@ -187,29 +187,30 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 
 `include "build_id.v" 
 localparam CONF_STR = {
-	"ADCTEST;;",
+	"ADCTest;;",
 	"-;",
 	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"-;",
 //	"O2,TV Mode,NTSC,PAL;",
 //	"O34,Noise,White,Red,Green,Blue;",
 	"O34,Max Value,25%,50%,75%,100%;",
 	"O67,Min Value,0%,25%,50%,75%;",
 	"-;",
-	"P1,Test Page 1;",
-	"P1-;",
-	"P1-, -= Options in page 1 =-;",
-	"P1-;",
-	"P1O5,Option 1-1,Off,On;",
-	"d0P1F1,BIN;",
-	"H0P1O6,Option 1-2,Off,On;",
-	"-;",
-	"P2,Test Page 2;",
-	"P2-;",
-	"P2-, -= Options in page 2 =-;",
-	"P2-;",
-	"P2S0,DSK;",
-	"P2O67,Option 2,1,2,3,4;",
-	"-;",
+//	"P1,Test Page 1;",
+//	"P1-;",
+//	"P1-, -= Options in page 1 =-;",
+//	"P1-;",
+//	"P1O5,Option 1-1,Off,On;",
+//	"d0P1F1,BIN;",
+//	"H0P1O6,Option 1-2,Off,On;",
+//	"-;",
+//	"P2,Test Page 2;",
+//	"P2-;",
+//	"P2-, -= Options in page 2 =-;",
+//	"P2-;",
+//	"P2S0,DSK;",
+//	"P2O67,Option 2,1,2,3,4;",
+//	"-;",
 	"-;",
 	"T0,Reset;",
 	"R0,Reset and close OSD;",
@@ -254,6 +255,40 @@ pll pll
 );
 
 wire reset = RESET | status[0] | buttons[1];
+
+/////////////////////// ADC Module  //////////////////////////////
+
+
+wire [11:0] adc_data;
+wire        adc_sync;
+reg [11:0] adc_value;
+reg adc_sync_d;
+
+ltc2308 #(1, 48000, 50000000) adc_input		// mono, ADC_RATE = 48000, CLK_RATE = 50000000
+(
+	.reset(reset),
+	.clk(CLK_50M),
+
+	.ADC_BUS(ADC_BUS),
+	.dout(adc_data),
+	.dout_sync(adc_sync)
+);
+
+always @(posedge CLK_50M) begin
+
+	adc_sync_d<=adc_sync;
+	if(adc_sync_d ^ adc_sync) begin
+		adc_value <= adc_data;
+
+      // check if higher than high, or lower than low
+		
+//		sum <= data1+data2+data3+data4;
+//
+//		if(sum[13:2]<HIST_LOW)  dout <= 0;
+//		if(sum[13:2]>HIST_HIGH) dout <= 1;
+	end
+end
+
 
 //////////////////////////////////////////////////////////////////
 
@@ -305,8 +340,14 @@ assign VGA_B  = video_b;
 
 //assign max_val = {status[4:3], 6'b111111};
 //assign min_val = {status[7:6], 6'b000000};
-assign max_val = 8'd128 - joya1[15:8];
-assign min_val = 8'd128 + joya1[7:0];
+
+// min val and max val based on joysticks:
+//assign max_val = 8'd128 - joya1[15:8];
+//assign min_val = 8'd128 + joya1[7:0];
+
+// min val and max val based on adc
+assign max_val = adc_value[11:4];
+assign min_val = 0;
 
 
 reg  [26:0] act_cnt;
