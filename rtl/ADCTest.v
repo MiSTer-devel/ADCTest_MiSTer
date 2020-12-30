@@ -111,7 +111,7 @@ always @(posedge clk) begin
 		if (adc_curr > adc_curr_d) begin
 		
 			if (adc_curr_d[11:4] > limit_3v3)
-				start_h <= limit_3v3 + left_edge_3v3;
+				start_h_3v3 <= limit_3v3 + left_edge_3v3;
 			else
 				start_h_3v3 <= adc_curr_d[11:4] + left_edge_3v3;
 
