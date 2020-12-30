@@ -4,11 +4,10 @@ module adctest
 	input         clk,
 	input         reset,
 	
-//	input         pal,
 	input         scandouble,
 
-	input  [7:0] max_val,
-	input  [7:0] min_val,
+	input  [11:0] adc_value,
+	input         range,
 
 	output reg    ce_pix,
 
@@ -24,21 +23,25 @@ module adctest
 
 reg   [9:0] hc;
 reg   [9:0] vc;
-//reg   [9:0] vvc;
-//reg  [63:0] rnd_reg;
-
-//wire  [5:0] rnd_c = {rnd_reg[0],rnd_reg[1],rnd_reg[2],rnd_reg[2],rnd_reg[2],rnd_reg[2]};
-//wire [63:0] rnd;
-
-// lfsr random(rnd);
-
-reg  big_gradation;
-reg  small_gradation;
-reg  disp_red;
-reg  disp_white;
 
 reg [9:0] start_line;
 reg [9:0] end_line;
+
+reg [11:0] adc_curr;
+reg [11:0] adc_curr_d;
+
+reg [8:0] start_h;
+reg [8:0] end_h;
+
+reg[8:0] left_edge_3v3 = 159;
+reg[8:0] limit_3v3 = 210;
+
+reg[8:0] left_edge_audio = 149;
+reg[8:0] limit_audio = 230;
+
+reg[8:0] left_edge;
+reg[8:0] limit;
+
 
 
 always @(posedge clk) begin
@@ -51,10 +54,13 @@ always @(posedge clk) begin
 	end
 	else if(ce_pix) begin
 		if(hc == 637) begin
+		
+			adc_curr   <= adc_value;
+			adc_curr_d <= adc_curr;
+			
 			hc <= 0;
 			if(vc == (scandouble ? 523 : 261)) begin 
 				vc <= 0;
-//				vvc <= vvc + 9'd6;
 			end else begin
 				vc <= vc + 1'd1;
 			end
@@ -62,7 +68,6 @@ always @(posedge clk) begin
 			hc <= hc + 1'd1;
 		end
 
-//		rnd_reg <= rnd;
 	end
 end
 
@@ -82,97 +87,72 @@ always @(posedge clk) begin
 			else if (vc == 0) VBlank <= 0;
 	end
 
-	if (hc == 0) begin
-		big_gradation <= 1'b0;
-		small_gradation <= 1'b0;
-		disp_red <= 1'b0;
-		disp_white <= 1'b0;
 
-		start_line <= { 2'b0, ~max_val[7:0] } + 9'd114;
-		end_line   <= { 2'b0, ~min_val[7:0] } + 9'd114;
-	end
-	
-	if (hc == 1) begin															// set the flags for the line
-
-		if(vc == (scandouble ? 112 : 56)) big_gradation <= 1'b1;			// 100%
-		if(vc == (scandouble ? 144 : 72)) small_gradation <= 1'b1;		// 87.5%
-		if(vc == (scandouble ? 176 : 88)) small_gradation <= 1'b1;		// 75%
-		if(vc == (scandouble ? 208 : 104)) small_gradation <= 1'b1;		// 62.5%
-		if	(vc == (scandouble ? 240 : 120)) big_gradation <= 1'b1;		// 50%
-		if(vc == (scandouble ? 272 : 136)) small_gradation <= 1'b1;		// 37.5%
-		if(vc == (scandouble ? 304 : 152)) small_gradation <= 1'b1;		// 25%
-		if(vc == (scandouble ? 336 : 168)) small_gradation <= 1'b1;		// 12.5%
-		if(vc == (scandouble ? 368 : 184)) big_gradation <= 1'b1;		// 0%
-		
-	end
+	video_r <= 0;
+	video_g <= 0;
+	video_b <= 0;
 	
 	if (hc == 2) begin
-//		if (scandouble == 1) begin
-//			if ((vc > start_line) && (vc < end_line)) begin
-//				if (vc < 164)
-//					disp_red <= 1'b1;
-//				else 
-//					disp_white <= 1'b1;
-//			end
-//		else
-			if ( (vc >= (start_line >> 1) ) && (vc < (end_line >> 1) ) ) begin
-				if (vc < 82)
-					disp_red <= 1'b1;
-				else 
-					disp_white <= 1'b1;
-			end
-//		end
+		if (range == 0) begin
+			limit			<= limit_3v3;
+			left_edge	<= left_edge_3v3;
+		end else begin
+			limit			<= limit_audio;
+			left_edge	<= left_edge_audio;
+		end
 	end
 
-   if ( (hc > 80) && (hc < 100) && (big_gradation == 1) ) begin
-//		if (scandouble == 1'b0) begin
+	if (hc == 3) begin
+		if (adc_curr > adc_curr_d) begin
+		
+			if (adc_curr_d[11:4] > limit_3v3)
+				start_h <= limit_3v3 + left_edge_3v3;
+			else
+				start_h <= adc_curr_d[11:4] + left_edge_3v3;
+
+			if (adc_curr[11:4] > limit_3v3)
+				end_h   <= limit_3v3 + left_edge_3v3;
+			else
+				end_h   <= adc_curr[11:4] + left_edge_3v3;
+
+		end
+		else begin
+			if (adc_curr[11:4] > limit_3v3)
+				start_h <= limit_3v3 +left_edge_3v3;
+			else
+				start_h <= adc_curr[11:4]   + left_edge_3v3;
+				
+			if (adc_curr_d[11:4] > limit_3v3)
+				end_h   <= limit_3v3 + left_edge_3v3;
+			else
+				end_h   <= adc_curr_d[11:4] + left_edge_3v3;
+
+		end
+	end
+
+	if (range == 0) begin				// Scale of 3.3V
+		if (hc == left_edge_3v3) begin
 			video_r <= 8'b1111_1111;
 			video_g <= 8'b1111_1111;
-//		end
-		video_b <= 8'b1111_1111;
+			video_b <= 8'b0000_1111;
+		end
+
+		if ((hc == left_edge_3v3) || (hc == left_edge_3v3 + (limit_3v3 >> 1)) || (hc == left_edge_3v3 + limit_3v3)) begin	// 3.3V range
+			video_r <= 8'b1111_1111;
+			video_g <= 8'b1111_1111;
+			video_b <= 8'b0000_0000;
+		end
+
+		if ((hc >= start_h) && (hc <= end_h)) begin
+			video_r <= 8'b1111_1111;
+			video_g <= 8'b1111_1111;
+			video_b <= 8'b1111_1111;
+		end
 	end
 
-   else if ( (hc > 95) && (hc < 100) && (small_gradation == 1) ) begin
-		video_r <= 8'b1111_1111;
-		video_g <= 8'b1111_1111;
-		video_b <= 8'b1111_1111;
-	end
-
-   else if ( (hc > 150) && (hc < 250) && (disp_red == 1) ) begin
-		video_r <= 8'b1111_1111;
-	end
-
-   else if ( (hc > 150) && (hc < 250) && (disp_white == 1) ) begin
-		video_r <= 8'b1111_1111;
-		video_g <= 8'b1111_1111;
-		video_b <= 8'b1111_1111;
-	end
-	
-   else if ( vc == start_line ) begin
-		video_r <= 8'b1111_1111;
-		video_g <= 8'b0000_0000;
-		video_b <= 8'b0000_0000;
-	end
-
-   else if ( vc == end_line ) begin
-		video_r <= 8'b0000_0000;
-		video_g <= 8'b1111_1111;
-		video_b <= 8'b0000_0000;
-	end
-
-	else begin
-		video_r <= 8'b0000_0000;
-		video_g <= 8'b0000_0000;
-		video_b <= 8'b0000_0000;
-	end
 
 	if (hc == 590) HSync <= 0;
 end
 
-//reg  [7:0] cos_out;
-//wire [5:0] cos_g = cos_out[7:3]+6'd32;
-//cos cos(vvc + {vc>>scandouble, 2'b00}, cos_out);
-
-// assign video_r = (cos_g >= rnd_c) ? {cos_g - rnd_c, 2'b00} : 8'd0;
 
 endmodule

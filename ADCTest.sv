@@ -182,7 +182,7 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 // 0         1         2         3
 // 01234567890123456789012345678901
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV
-//    XXXXXXX 
+//         XX 
 
 
 `include "build_id.v" 
@@ -191,26 +191,7 @@ localparam CONF_STR = {
 	"-;",
 	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
-//	"O2,TV Mode,NTSC,PAL;",
-//	"O34,Noise,White,Red,Green,Blue;",
-	"O34,Max Value,25%,50%,75%,100%;",
-	"O67,Min Value,0%,25%,50%,75%;",
-	"-;",
-//	"P1,Test Page 1;",
-//	"P1-;",
-//	"P1-, -= Options in page 1 =-;",
-//	"P1-;",
-//	"P1O5,Option 1-1,Off,On;",
-//	"d0P1F1,BIN;",
-//	"H0P1O6,Option 1-2,Off,On;",
-//	"-;",
-//	"P2,Test Page 2;",
-//	"P2-;",
-//	"P2-, -= Options in page 2 =-;",
-//	"P2-;",
-//	"P2S0,DSK;",
-//	"P2O67,Option 2,1,2,3,4;",
-//	"-;",
+	"O3,Scale,0-3.3V,Line Level;",
 	"-;",
 	"T0,Reset;",
 	"R0,Reset and close OSD;",
@@ -292,7 +273,6 @@ end
 
 //////////////////////////////////////////////////////////////////
 
-//wire [1:0] col = status[4:3];
 
 wire HBlank;
 wire HSync;
@@ -303,18 +283,14 @@ wire [7:0] video_r;
 wire [7:0] video_g;
 wire [7:0] video_b;
 
-reg [7:0] max_val;
-reg [7:0] min_val;
-
 adctest adctest
 (
 	.clk(clk_sys),
 	.reset(reset),
 	
-//	.pal(status[2]),
 	.scandouble(forced_scandoubler),
-	.max_val( max_val ),
-	.min_val( min_val ),
+	.adc_value( adc_value ),
+	.range(status[3]),
 
 	.ce_pix(ce_pix),
 
@@ -337,17 +313,6 @@ assign VGA_VS = VSync;
 assign VGA_R  = video_r;
 assign VGA_G  = video_g;
 assign VGA_B  = video_b;
-
-//assign max_val = {status[4:3], 6'b111111};
-//assign min_val = {status[7:6], 6'b000000};
-
-// min val and max val based on joysticks:
-//assign max_val = 8'd128 - joya1[15:8];
-//assign min_val = 8'd128 + joya1[7:0];
-
-// min val and max val based on adc
-assign max_val = adc_value[11:4];
-assign min_val = 0;
 
 
 reg  [26:0] act_cnt;
