@@ -30,8 +30,8 @@ reg [9:0] end_line;
 reg [11:0] adc_curr;
 reg [11:0] adc_curr_d;
 
-reg [8:0] start_h;
-reg [8:0] end_h;
+reg [8:0] start_h_3v3;
+reg [8:0] end_h_3v3;
 
 reg[8:0] left_edge_3v3 = 159;
 reg[8:0] limit_3v3 = 208;
@@ -73,6 +73,9 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk) begin
+//	reg left_val_3v3;
+//	reg right_val_3v3;
+	
 	if (hc == 529)
 		HBlank <= 1;
 	else if (hc == 0)
@@ -93,7 +96,7 @@ always @(posedge clk) begin
 	video_g <= 0;
 	video_b <= 0;
 	
-	if (hc == 2) begin
+	if (hc == 2) begin						// beginning of scanline: determine range
 		if (range == 0) begin
 			limit			<= limit_3v3;
 			left_edge	<= left_edge_3v3;
@@ -103,42 +106,51 @@ always @(posedge clk) begin
 		end
 	end
 
-	if (hc == 3) begin
+	if (hc == 3) begin						// next pixel: determine start/end values for this line
+	
 		if (adc_curr > adc_curr_d) begin
 		
 			if (adc_curr_d[11:4] > limit_3v3)
 				start_h <= limit_3v3 + left_edge_3v3;
 			else
-				start_h <= adc_curr_d[11:4] + left_edge_3v3;
+				start_h_3v3 <= adc_curr_d[11:4] + left_edge_3v3;
+
+				
+			if (adc_curr[11:4] > limit_3v3)
+				end_h_3v3   <= limit_3v3 + left_edge_3v3;
+			else
+				end_h_3v3   <= adc_curr[11:4] + left_edge_3v3;
+			
+		end else begin
 
 			if (adc_curr[11:4] > limit_3v3)
-				end_h   <= limit_3v3 + left_edge_3v3;
+				start_h_3v3 <= limit_3v3 +left_edge_3v3;
 			else
-				end_h   <= adc_curr[11:4] + left_edge_3v3;
-
-		end
-		else begin
-			if (adc_curr[11:4] > limit_3v3)
-				start_h <= limit_3v3 +left_edge_3v3;
-			else
-				start_h <= adc_curr[11:4]   + left_edge_3v3;
+				start_h_3v3 <= adc_curr[11:4]   + left_edge_3v3;
 				
 			if (adc_curr_d[11:4] > limit_3v3)
-				end_h   <= limit_3v3 + left_edge_3v3;
+				end_h_3v3   <= limit_3v3 + left_edge_3v3;
 			else
-				end_h   <= adc_curr_d[11:4] + left_edge_3v3;
-
+				end_h_3v3   <= adc_curr_d[11:4] + left_edge_3v3;
 		end
+
 	end
+
+	if (hc == left_edge) begin				// left edge marker
+		video_r <= 8'b1111_1111;
+		video_g <= 8'b1111_1111;
+		video_b <= 8'b0000_0000;
+	end
+
+	if (hc == left_edge + limit) begin	// right edge marker
+		video_r <= 8'b1111_1111;
+		video_g <= 8'b1111_1111;
+		video_b <= 8'b0000_0000;
+	end
+
 
 	if (range == 0) begin				// Scale of 3.3V
 	
-		if (hc == left_edge_3v3) begin
-			video_r <= 8'b1111_1111;
-			video_g <= 8'b1111_1111;
-			video_b <= 8'b0000_0000;
-		end
-
 		if ((hc == left_edge_3v3 + pervolt_3v3) || (hc == left_edge_3v3 + (pervolt_3v3 << 1)) ||		// Green gradations at each volt
 			 (hc == left_edge_3v3 + (pervolt_3v3 << 1) + pervolt_3v3))
 		begin
@@ -158,17 +170,20 @@ always @(posedge clk) begin
 			end
 		end
 		
-		if (hc == left_edge_3v3 + limit_3v3) begin	// 3.3V range
-			video_r <= 8'b1111_1111;
-			video_g <= 8'b1111_1111;
-			video_b <= 8'b0000_0000;
-		end
-
-		if ((hc >= start_h) && (hc <= end_h)) begin	// draw the voltage measurement in white
+		if ((hc >= start_h_3v3) && (hc <= end_h_3v3)) begin	// draw the voltage measurement in white
 			video_r <= 8'b1111_1111;
 			video_g <= 8'b1111_1111;
 			video_b <= 8'b1111_1111;
 		end
+		
+	end else begin
+	
+		if ((vc & 2) && (hc == left_edge + (limit >> 1)) ) begin		// halfway point - dotted line
+			video_r <= 8'b0000_0000;
+			video_g <= 8'b0011_1111;
+			video_b <= 8'b0000_0000;
+		end
+
 	end
 
 
