@@ -34,7 +34,8 @@ reg [8:0] start_h;
 reg [8:0] end_h;
 
 reg[8:0] left_edge_3v3 = 159;
-reg[8:0] limit_3v3 = 210;
+reg[8:0] limit_3v3 = 208;
+reg[8:0] pervolt_3v3 = 63;
 
 reg[8:0] left_edge_audio = 149;
 reg[8:0] limit_audio = 230;
@@ -131,19 +132,39 @@ always @(posedge clk) begin
 	end
 
 	if (range == 0) begin				// Scale of 3.3V
+	
 		if (hc == left_edge_3v3) begin
-			video_r <= 8'b1111_1111;
-			video_g <= 8'b1111_1111;
-			video_b <= 8'b0000_1111;
-		end
-
-		if ((hc == left_edge_3v3) || (hc == left_edge_3v3 + (limit_3v3 >> 1)) || (hc == left_edge_3v3 + limit_3v3)) begin	// 3.3V range
 			video_r <= 8'b1111_1111;
 			video_g <= 8'b1111_1111;
 			video_b <= 8'b0000_0000;
 		end
 
-		if ((hc >= start_h) && (hc <= end_h)) begin
+		if ((hc == left_edge_3v3 + pervolt_3v3) || (hc == left_edge_3v3 + (pervolt_3v3 << 1)) ||		// Green gradations at each volt
+			 (hc == left_edge_3v3 + (pervolt_3v3 << 1) + pervolt_3v3))
+		begin
+			video_r <= 8'b0000_0000;
+			video_g <= 8'b0011_1111;
+			video_b <= 8'b0000_0000;
+		end
+		
+		if (vc & 2) begin
+			if ((hc == left_edge_3v3 + (pervolt_3v3 >> 1)) ||
+			    (hc == left_edge_3v3 + pervolt_3v3 + (pervolt_3v3 >> 1)) ||
+				 (hc == left_edge_3v3 + (pervolt_3v3 << 1) + (pervolt_3v3 >> 1)) )		// dotted line at each half-volt
+			begin
+				video_r <= 8'b0000_0000;
+				video_g <= 8'b0001_1111;
+				video_b <= 8'b0000_0000;
+			end
+		end
+		
+		if (hc == left_edge_3v3 + limit_3v3) begin	// 3.3V range
+			video_r <= 8'b1111_1111;
+			video_g <= 8'b1111_1111;
+			video_b <= 8'b0000_0000;
+		end
+
+		if ((hc >= start_h) && (hc <= end_h)) begin	// draw the voltage measurement in white
 			video_r <= 8'b1111_1111;
 			video_g <= 8'b1111_1111;
 			video_b <= 8'b1111_1111;
