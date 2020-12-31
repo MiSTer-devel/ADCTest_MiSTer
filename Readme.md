@@ -28,5 +28,5 @@ At present, this core is written to support only mono input, although it could b
 ### Screenshot
 * Below is a screenshot of a TRS-80 Model I cassette tape input (500 baud)
 
-![TRS-80 Model I cassette tape](blob/master/img/20201231_183601-screen.png)
+![TRS-80 Model I cassette tape](img/20201231_183601-screen.png)
 
