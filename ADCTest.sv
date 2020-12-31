@@ -162,9 +162,9 @@ assign VGA_SL = 0;
 assign VGA_F1 = 0;
 assign VGA_SCALER = 0;
 
-assign AUDIO_S = 0;
-assign AUDIO_L = 0;
-assign AUDIO_R = 0;
+assign AUDIO_S = 1;
+assign AUDIO_L = status[4] ? {2'b00, adc_value[11:0] , 2'b00 } : 1650;	// 1650 is roughly 1.65V which is middle of the range,
+assign AUDIO_R = status[4] ? {2'b00, adc_value[11:0] , 2'b00 } : 1650;	// so switching on/off won't click so loudly
 assign AUDIO_MIX = 0;
 
 assign LED_DISK = 0;
@@ -182,7 +182,7 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 // 0         1         2         3
 // 01234567890123456789012345678901
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV
-//         XX 
+//    XX   XX 
 
 
 `include "build_id.v" 
@@ -191,7 +191,8 @@ localparam CONF_STR = {
 	"-;",
 	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
-	"O3,Scale,0-3.3V,Line Level;",
+	"O3,Scale,3.3V,Line Level;",
+	"O4,Audio Passthru,No,Yes;",
 	"-;",
 	"T0,Reset;",
 	"R0,Reset and close OSD;",
@@ -260,13 +261,6 @@ always @(posedge CLK_50M) begin
 	adc_sync_d<=adc_sync;
 	if(adc_sync_d ^ adc_sync) begin
 		adc_value <= adc_data;
-
-      // check if higher than high, or lower than low
-		
-//		sum <= data1+data2+data3+data4;
-//
-//		if(sum[13:2]<HIST_LOW)  dout <= 0;
-//		if(sum[13:2]>HIST_HIGH) dout <= 1;
 	end
 end
 
