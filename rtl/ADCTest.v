@@ -25,10 +25,6 @@ reg   [9:0] hc;
 reg   [9:0] vc;
 
 
-//reg [11:0] adc_curr;
-//reg [11:0] adc_curr_d;
-
-
 // For audio line level, this is AC coupling; we must determine 'swing' from average value
 // samples are taken at the beginning of each scanline (adc_val[n]), and
 // a running total is kept in adc_total - which is 256 times the average amount
@@ -84,9 +80,6 @@ always @(posedge clk) begin
 	else if(ce_pix) begin
 		if(hc == 637) begin
 		
-//			adc_curr   <= adc_value;
-//			adc_curr_d <= adc_curr;
-
 			adc_val[0] <= adc_value;
 			adc_total  <= adc_total - adc_val[255] + adc_value;
 
@@ -108,8 +101,6 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk) begin
-//	reg left_val_3v3;
-//	reg right_val_3v3;
 	
 	if (hc == 529)
 		HBlank <= 1;
