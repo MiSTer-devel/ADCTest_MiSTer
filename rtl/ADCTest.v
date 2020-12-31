@@ -208,8 +208,9 @@ always @(posedge clk) begin
 
 	if (range == 0) begin				// Scale of 3.3V
 	
-		if ((hc == left_edge_3v3 + pervolt_3v3) || (hc == left_edge_3v3 + (pervolt_3v3 << 1)) ||		// Green gradations at each volt
-			 (hc == left_edge_3v3 + (pervolt_3v3 << 1) + pervolt_3v3))
+		if ((hc == left_edge_3v3 + pervolt_3v3) ||
+			 (hc == left_edge_3v3 + (pervolt_3v3 << 1)) ||
+			 (hc == left_edge_3v3 + (pervolt_3v3 << 1) + pervolt_3v3))							// Green gradations at each volt
 		begin
 			video_r <= 8'b0000_0000;
 			video_g <= 8'b0011_1111;
@@ -219,7 +220,7 @@ always @(posedge clk) begin
 		if (vc & 2) begin
 			if ((hc == left_edge_3v3 + (pervolt_3v3 >> 1)) ||
 			    (hc == left_edge_3v3 + pervolt_3v3 + (pervolt_3v3 >> 1)) ||
-				 (hc == left_edge_3v3 + (pervolt_3v3 << 1) + (pervolt_3v3 >> 1)) )		// dotted line at each half-volt
+				 (hc == left_edge_3v3 + (pervolt_3v3 << 1) + (pervolt_3v3 >> 1)) )			// dotted line at each half-volt
 			begin
 				video_r <= 8'b0000_0000;
 				video_g <= 8'b0001_1111;
@@ -233,7 +234,7 @@ always @(posedge clk) begin
 			video_b <= 8'b0000_0000;
 		end
 
-		if ((hc >= start_h_3v3) && (hc <= end_h_3v3)) begin	// draw the voltage measurement in white
+		if ((hc >= start_h_3v3) && (hc <= end_h_3v3)) begin										// draw the voltage measurement in white
 			video_r <= 8'b1111_1111;
 			video_g <= 8'b1111_1111;
 			video_b <= 8'b1111_1111;
