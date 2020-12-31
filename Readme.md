@@ -25,3 +25,8 @@ At present, this core is written to support only mono input, although it could b
 * The Line Input scale is based on consumer audio equipment, where "0dB" is measured as 896mV peak-to-peak.  A "red line" area is drawn representing the area from "0dB" to "+3dB"
 * For the Line Input, we assume AC coupling, which means that we need to track the average signal value (which may drift over time), and relate instantaneous values as +/- positions from the moving average.  In order to track the average, an array of 256 samples (from the beginning of each scanline) is maintained, and a running total of the "most recent 256 values" is maintained (from which the average is easily derived).  The average value is snapshotted at VSYNC time, for use on the next screen.
 
+### Screenshot
+* Below is a screenshot of a TRS-80 Model I cassette tape input (500 baud)
+
+![TRS-80 Model I cassette tape](blob/master/img/20201231_183601-screen.png)
+
