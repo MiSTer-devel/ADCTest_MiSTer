@@ -6,7 +6,7 @@ module adctest
 	
 	input         scandouble,
 
-	input  [11:0] adc_value,
+	input  [23:0] adc_value,
 	input         range,
 
 	output reg    ce_pix,
@@ -31,9 +31,12 @@ reg   [9:0] vc;
 // The average is snapshotted once per frame (vsync), but can honestly be taken at any time
 
 integer ii=0;
-reg [11:0] adc_val[0:255];
-reg [20:0] adc_total = 0;
-reg [11:0] adc_avg;
+reg [11:0] adc_val_l[0:255];
+reg [11:0] adc_val_r[0:255];
+reg [20:0] adc_total_l = 0;
+reg [20:0] adc_total_r = 0;
+reg [11:0] adc_avg_l;
+reg [11:0] adc_avg_r;
 
 
 
@@ -45,8 +48,10 @@ reg [8:0] left_edge_3v3 = 159;
 reg [8:0] limit_3v3 = 208;
 reg [8:0] pervolt_3v3 = 63;
 
-reg [8:0] start_h_3v3;
-reg [8:0] end_h_3v3;
+reg [8:0] start_l_3v3;
+reg [8:0] end_l_3v3;
+reg [8:0] start_r_3v3;
+reg [8:0] end_r_3v3;
 
 
 // line level for consumer equipment is 0.894V peak-to-peak; for this reduced scale,
@@ -59,9 +64,10 @@ reg [8:0] red_zone_r_audio = 378;
 reg [8:0] limit_audio = 318;
 reg [8:0] half_limit_audio = 159;
 
-reg [9:0] start_h_line;
-reg [9:0] end_h_line;
-
+reg [9:0] start_l_line;
+reg [9:0] end_l_line;
+reg [9:0] start_r_line;
+reg [9:0] end_r_line;
 
 
 reg[8:0] left_edge;
@@ -78,22 +84,31 @@ always @(posedge clk) begin
 		vc <= 0;
 	end
 	else if(ce_pix) begin
-		if(hc == 637) begin
-		
-			adc_val[0] <= adc_value;
-			adc_total  <= adc_total - adc_val[255] + adc_value;
+		if(hc == 637) begin									// at end of line, get ready for next line
 
-			for (ii=0; ii<255; ii=ii+1)
-				adc_val[ii+1] <= adc_val[ii];
+			adc_val_l[0] <= adc_value[11:0];
+			adc_total_l  <= adc_total_l - adc_val_l[255] + adc_value[11:0];
+
+			adc_val_r[0] <= adc_value[23:12];
+			adc_total_r  <= adc_total_r - adc_val_r[255] + adc_value[23:12];
+
+			for (ii=0; ii<255; ii=ii+1) begin			// keep running FIFO queue of 256 values for averaging
+				adc_val_l[ii+1] <= adc_val_l[ii];
+				adc_val_r[ii+1] <= adc_val_r[ii];
+			end
 			
 			hc <= 0;
+
 			if(vc == (scandouble ? 523 : 261)) begin
 				vc <= 0;
-				adc_avg <= adc_total[19:8];			// grab average value once per VSYNC
-			end else begin
+				adc_avg_l <= adc_total_l[19:8];			// grab average value once per VSYNC
+				adc_avg_r <= adc_total_r[19:8];			// grab average value once per VSYNC
+			end
+			else begin
 				vc <= vc + 1'd1;
 			end
-		end else begin
+		end
+		else begin
 			hc <= hc + 1'd1;
 		end
 
@@ -134,75 +149,128 @@ always @(posedge clk) begin
 
 	if (hc == 3) begin								// next pixel: determine start/end values for this line
 	
-		// we're going to draw a horizontal line from old value to new value
-		// first find which is the leftmost dot
-		//
+		// We're going to draw a horizontal line from old value to new value
+		// First find which is the leftmost dot
+
 		// Do the calculations for the 3.3V scale here
-
-		if (adc_val[0] > adc_val[1]) begin		
 		
-			if (adc_val[1][11:4] > limit_3v3)
-				start_h_3v3 <= limit_3v3        + left_edge_3v3;
-			else
-				start_h_3v3 <= adc_val[1][11:4] + left_edge_3v3;
+		start_l_3v3 <= adc_val_l[0][11:4] + left_edge_3v3;
+		end_l_3v3   <= adc_val_l[1][11:4] + left_edge_3v3;
 
-				
-			if (adc_val[0][11:4] > limit_3v3)
-				end_h_3v3   <= limit_3v3        + left_edge_3v3;
-			else
-				end_h_3v3   <= adc_val[0][11:4] + left_edge_3v3;
+	   start_r_3v3 <= adc_val_r[0][11:4] + left_edge_3v3;
+		end_r_3v3   <= adc_val_r[1][11:4] + left_edge_3v3;
 
-		end else begin
-
-			if (adc_val[0][11:4] > limit_3v3)
-				start_h_3v3 <= limit_3v3 +left_edge_3v3;
-			else
-				start_h_3v3 <= adc_val[0][11:4] + left_edge_3v3;
-
-			if (adc_val[1][11:4] > limit_3v3)
-				end_h_3v3   <= limit_3v3        + left_edge_3v3;
-			else
-				end_h_3v3   <= adc_val[1][11:4] + left_edge_3v3;
-		end
 		
 		// Now, do the calculations for the line level
-		
-		if (adc_val[0] > adc_avg) begin
-			if (adc_val[0][11:2] - adc_avg[11:2] > half_limit_audio)
-				start_h_line <= limit_audio + left_edge_audio;
+
+		// Left channel:
+	
+		if (adc_val_l[0] > adc_avg_l) begin
+			if (adc_val_l[0][11:2] - adc_avg_l[11:2] > half_limit_audio)
+				start_l_line <= limit_audio + left_edge_audio;
 			else
-				start_h_line <= left_edge_audio + adc_val[0][11:2] - adc_avg[11:2] + half_limit_audio;
+				start_l_line <= left_edge_audio + adc_val_l[0][11:2] - adc_avg_l[11:2] + half_limit_audio;
 				
 		end else begin
 		
-			if (adc_avg[11:2] - adc_val[0][11:2] > half_limit_audio)
-				start_h_line <= left_edge_audio;
+			if (adc_avg_l[11:2] - adc_val_l[0][11:2] > half_limit_audio)
+				start_l_line <= left_edge_audio;
 			else
-				start_h_line <= left_edge_audio + adc_val[0][11:2] - adc_avg[11:2] + half_limit_audio;
+				start_l_line <= left_edge_audio + adc_val_l[0][11:2] - adc_avg_l[11:2] + half_limit_audio;
 		end
 
-		if (adc_val[1] > adc_avg) begin
-			if (adc_val[1][11:2] - adc_avg[11:2] > half_limit_audio)
-				end_h_line <= limit_audio + left_edge_audio;
+		if (adc_val_l[1] > adc_avg_l) begin
+			if (adc_val_l[1][11:2] - adc_avg_l[11:2] > half_limit_audio)
+				end_l_line <= limit_audio + left_edge_audio;
 			else
-				end_h_line <= left_edge_audio + adc_val[1][11:2] - adc_avg[11:2] + half_limit_audio;
+				end_l_line <= left_edge_audio + adc_val_l[1][11:2] - adc_avg_l[11:2] + half_limit_audio;
 				
 		end else begin
 		
-			if (adc_avg[11:2] - adc_val[1][11:2] > half_limit_audio)
-				end_h_line <= left_edge_audio;
+			if (adc_avg_l[11:2] - adc_val_l[1][11:2] > half_limit_audio)
+				end_l_line <= left_edge_audio;
 			else
-				end_h_line <= left_edge_audio + adc_val[1][11:2] - adc_avg[11:2] + half_limit_audio;
+				end_l_line <= left_edge_audio + adc_val_l[1][11:2] - adc_avg_l[11:2] + half_limit_audio;
+		end
+
+		
+		// Right channel:
+		
+		if (adc_val_r[0] > adc_avg_r) begin
+			if (adc_val_r[0][11:2] - adc_avg_r[11:2] > half_limit_audio)
+				start_r_line <= limit_audio + left_edge_audio;
+			else
+				start_r_line <= left_edge_audio + adc_val_r[0][11:2] - adc_avg_r[11:2] + half_limit_audio;
+				
+		end else begin
+		
+			if (adc_avg_r[11:2] - adc_val_r[0][11:2] > half_limit_audio)
+				start_r_line <= left_edge_audio;
+			else
+				start_r_line <= left_edge_audio + adc_val_r[0][11:2] - adc_avg_r[11:2] + half_limit_audio;
+		end
+
+		if (adc_val_r[1] > adc_avg_r) begin
+			if (adc_val_r[1][11:2] - adc_avg_r[11:2] > half_limit_audio)
+				end_r_line <= limit_audio + left_edge_audio;
+			else
+				end_r_line <= left_edge_audio + adc_val_r[1][11:2] - adc_avg_r[11:2] + half_limit_audio;
+				
+		end else begin
+		
+			if (adc_avg_r[11:2] - adc_val_r[1][11:2] > half_limit_audio)
+				end_r_line <= left_edge_audio;
+			else
+				end_r_line <= left_edge_audio + adc_val_r[1][11:2] - adc_avg_r[11:2] + half_limit_audio;
 		end
 
 	end
-	
-	if (hc == 4) begin						// now to get the order correct, check if they are correct
 
-		if (start_h_line > end_h_line) begin
-			end_h_line		<= start_h_line;
-			start_h_line	<= end_h_line;
+	
+	if (hc == 4) begin						// clamping (for exceeding the range)
+
+		// Do the calculations for the 3.3V scale here
+
+		if (start_l_3v3 > (left_edge_3v3 + limit_3v3))
+		   start_l_3v3 <= (left_edge_3v3 + limit_3v3);
+			
+		if (end_l_3v3 > (left_edge_3v3 + limit_3v3))
+		   end_l_3v3 <= (left_edge_3v3 + limit_3v3);
+
+		if (start_r_3v3 > (left_edge_3v3 + limit_3v3))
+		   start_r_3v3 <= (left_edge_3v3 + limit_3v3);
+			
+		if (end_r_3v3 > (left_edge_3v3 + limit_3v3))
+		   end_r_3v3 <= (left_edge_3v3 + limit_3v3);		
+		
+	end
+
+	if (hc == 5) begin						// now to get the order correct, check if they are correct
+
+		// Do the calculations for the 3.3V scale here
+
+		if (start_l_3v3 > end_l_3v3) begin
+			start_l_3v3 <= end_l_3v3;
+			end_l_3v3   <= start_l_3v3;
 		end
+
+		if (start_r_3v3 > end_r_3v3) begin
+			start_r_3v3 <= end_r_3v3;
+			end_r_3v3   <= start_r_3v3;
+		end
+
+		// Do the calculations for the line-level scale here
+
+		if (start_l_line > end_l_line) begin
+			end_l_line		<= start_l_line;
+			start_l_line	<= end_l_line;
+		end
+
+		if (start_r_line > end_r_line) begin
+			end_r_line		<= start_r_line;
+			start_r_line	<= end_r_line;
+		end
+		
 	end
 
 
@@ -212,9 +280,9 @@ always @(posedge clk) begin
 			 (hc == left_edge_3v3 + (pervolt_3v3 << 1)) ||
 			 (hc == left_edge_3v3 + (pervolt_3v3 << 1) + pervolt_3v3))							// Green gradations at each volt
 		begin
-			video_r <= 8'b0000_0000;
-			video_g <= 8'b0011_1111;
-			video_b <= 8'b0000_0000;
+			video_r <= 8'h00;
+			video_g <= 8'h3F;
+			video_b <= 8'h00;
 		end
 		
 		if (vc & 2) begin
@@ -222,77 +290,84 @@ always @(posedge clk) begin
 			    (hc == left_edge_3v3 + pervolt_3v3 + (pervolt_3v3 >> 1)) ||
 				 (hc == left_edge_3v3 + (pervolt_3v3 << 1) + (pervolt_3v3 >> 1)) )			// dotted line at each half-volt
 			begin
-				video_r <= 8'b0000_0000;
-				video_g <= 8'b0001_1111;
-				video_b <= 8'b0000_0000;
+				video_r <= 8'h00;
+				video_g <= 8'h1F;
+				video_b <= 8'h00;
 			end
 		end
 
-		if (hc == (left_edge_3v3 + adc_avg[11:4])) begin
-			video_r <= 8'b0111_1111;
-			video_g <= 8'b0000_0000;
-			video_b <= 8'b0000_0000;
+		if (hc == (left_edge_3v3 + adc_avg_l[11:4])) begin											// light grey line for average (left)
+			video_r <= 8'h4F;
+			video_g <= 8'h4F;
+			video_b <= 8'h4F;
 		end
 
-		if ((hc >= start_h_3v3) && (hc <= end_h_3v3)) begin										// draw the voltage measurement in white
-			video_r <= 8'b1111_1111;
-			video_g <= 8'b1111_1111;
-			video_b <= 8'b1111_1111;
+		if (hc == (left_edge_3v3 + adc_avg_r[11:4])) begin											// light red line for average (right)
+			video_r <= 8'h7F;
+			video_g <= 8'h00;
+			video_b <= 8'h00;
+		end
+
+
+		if ((hc >= start_l_3v3) && (hc <= end_l_3v3)) begin										// draw the voltage measurement in white (left)
+			video_r <= 8'hBF;
+			video_g <= 8'hBF;
+			video_b <= 8'hBF;
+		end
+
+		if ((hc >= start_r_3v3) && (hc <= end_r_3v3)) begin										// draw the voltage measurement in red (right)
+			video_r <= 8'hFF;
+			video_g <= 8'h00;
+			video_b <= 8'h00;
 		end
 		
-	end else begin
+	end
+	else begin								// Line-level display
 	
 		if ((vc & 2) && (hc == left_edge + (limit >> 1)) ) begin									// halfway point - dotted line
-			video_r <= 8'b0000_0000;
-			video_g <= 8'b0011_1111;
-			video_b <= 8'b0000_0000;
+			video_r <= 8'h00;
+			video_g <= 8'h3F;
+			video_b <= 8'h00;
 		end
 
 		if ((hc >= left_edge_audio) && (hc <= red_zone_l_audio)) begin							// shaded left red zone
-			video_r <= 8'b0001_1111;
-			video_g <= 8'b0000_0000;
-			video_b <= 8'b0000_0000;
+			video_r <= 8'h1F;
+			video_g <= 8'h00;
+			video_b <= 8'h00;
 		end
 
 		if ((hc >= red_zone_r_audio) && (hc <= (left_edge_audio + limit_audio))) begin	// shaded right red zone
-			video_r <= 8'b0001_1111;
-			video_g <= 8'b0000_0000;
-			video_b <= 8'b0000_0000;
+			video_r <= 8'h1F;
+			video_g <= 8'h00;
+			video_b <= 8'h00;
 		end
 
-		if ((hc >= start_h_line) && (hc <= end_h_line) && (hc <= red_zone_l_audio)) begin		// draw wave within the left red zone
-			video_r <= 8'b1111_1111;
-			video_g <= 8'b0000_0000;
-			video_b <= 8'b0000_0000;
-		end
-
-		if ((hc >= start_h_line) && (hc <= end_h_line) && (hc >= red_zone_r_audio)) begin		// draw wave within the right red zone
-			video_r <= 8'b1111_1111;
-			video_g <= 8'b0000_0000;
-			video_b <= 8'b0000_0000;
-		end
-
-		if ((hc >= start_h_line) && (hc <= end_h_line) &&
-			 (hc >= red_zone_l_audio) && (hc <= red_zone_r_audio))										// draw wave within the middle white zone
+		if ((hc >= start_l_line) && (hc <= end_l_line))														// draw wave in white (left)
 		begin
-			video_r <= 8'b1111_1111;
-			video_g <= 8'b1111_1111;
-			video_b <= 8'b1111_1111;
+			video_r <= 8'hBF;
+			video_g <= 8'hBF;
+			video_b <= 8'hBF;
 		end
 
+		if ((hc >= start_r_line) && (hc <= end_r_line))														// draw wave in red (right)
+		begin
+			video_r <= 8'hFF;
+			video_g <= 8'h00;
+			video_b <= 8'h00;
+		end
 
 	end
 
 	if (hc == left_edge) begin				// left edge marker
-		video_r <= 8'b1111_1111;
-		video_g <= 8'b1111_1111;
-		video_b <= 8'b0000_0000;
+		video_r <= 8'hFF;
+		video_g <= 8'hFF;
+		video_b <= 8'h00;
 	end
 
 	if (hc == left_edge + limit) begin	// right edge marker
-		video_r <= 8'b1111_1111;
-		video_g <= 8'b1111_1111;
-		video_b <= 8'b0000_0000;
+		video_r <= 8'hFF;
+		video_g <= 8'hFF;
+		video_b <= 8'h00;
 	end
 
 

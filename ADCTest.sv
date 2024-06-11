@@ -188,7 +188,7 @@ assign HDMI_FREEZE = 0;
 
 assign AUDIO_S = 1;
 assign AUDIO_L = status[4] ? {2'b00, adc_value[11:0] , 2'b00 } : 1650;	// 1650 is roughly 1.65V which is middle of the range,
-assign AUDIO_R = status[4] ? {2'b00, adc_value[11:0] , 2'b00 } : 1650;	// so switching on/off won't click so loudly
+assign AUDIO_R = status[4] ? {2'b00, adc_value[23:12], 2'b00 } : 1650;	// so switching on/off won't click so loudly
 assign AUDIO_MIX = 0;
 
 assign LED_DISK = 0;
@@ -231,8 +231,6 @@ wire   [1:0] buttons;
 wire [127:0] status;
 wire  [10:0] ps2_key;
 
-//wire [15:0] joya1;
-
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -246,8 +244,6 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.buttons(buttons),
 	.status(status),
 	.status_menumask({status[5]}),
-	
-//   .joystick_analog_0(joya1),
 	
 	.ps2_key(ps2_key)
 );
@@ -267,12 +263,12 @@ wire reset = RESET | status[0] | buttons[1];
 /////////////////////// ADC Module  //////////////////////////////
 
 
-wire [11:0] adc_data;
+wire [23:0] adc_data;		// stereo, 12 bit
 wire        adc_sync;
-reg [11:0] adc_value;
+reg [23:0] adc_value;
 reg adc_sync_d;
 
-ltc2308 #(1, 48000, 50000000) adc_input		// mono, ADC_RATE = 48000, CLK_RATE = 50000000
+ltc2308 #(2, 96000, 50000000) adc_input		// stereo, ADC_RATE = 96000, CLK_RATE = 50000000
 (
 	.reset(reset),
 	.clk(CLK_50M),

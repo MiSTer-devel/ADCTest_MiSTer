@@ -5,7 +5,7 @@ This core reads digital sample values from the ADC input and displays them graph
 
 The core is simple enough that any developer interested in working with ADC - or creating their own core - may wish to consult the code, comparing it against the "Template-MiSTer" core, from which it is derived.
 
-At present, this core is written to support only mono input, although it could be extended to stereo.  For mono input, the signal is conveyed through the tip of the 3.5mm plug (ground is the large section of the shank of the plug).
+This core is now written to support stereoo input, with RED signifying the RIGHT channel, and WHITE signifying the LEFT channel (as per convention).  For the LEFT channel input, the signal is conveyed through the tip of the 3.5mm plug, the RIGHT channel is the mid-section 'sleeve' on the plug (and ground is the large section of the shank of the plug).
 
 ## Technical Details
 
